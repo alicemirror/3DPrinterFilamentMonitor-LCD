@@ -96,8 +96,8 @@
 #define MIN_EXTRUDER_TENSION 50
 
 // Filament units in grams
-#define UNITS_GR 1
-#define UNITS_CM 2
+#define _GR 1
+#define _CM 2
 
 // Filament material input pin
 #define MATERIAL_PIN 7
@@ -105,7 +105,7 @@
 #define WEIGHT_PIN 11
 
 // Control buttons pins
-#define CHANGE_UNIT_PIN A0
+#define CHANGE_UNIT_PIN 8
 #define SETZERO_PIN 12
 
 // LED pin on when reading

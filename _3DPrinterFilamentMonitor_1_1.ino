@@ -90,7 +90,7 @@ void setup() {
   pinMode(WEIGHT_PIN, INPUT);     // Dip switch filament weight select
   pinMode(READING_PIN, OUTPUT);   // LED reading signal
   pinMode(SETZERO_PIN, INPUT);    // Push button state change
-  pinMode(RESTART_PIN, OUTPUT);   // Push button restart material
+  pinMode(CHANGE_UNIT_PIN, INPUT);   // Push button restart material
 
   // Initialised the default values for the default filament type
   setDefaults();
@@ -174,14 +174,17 @@ void loop() {
 
   // Manage the partial consumption button. Only when STAT_PRINTING
   if(digitalRead(CHANGE_UNIT_PIN)) {
-    delay(100); // Barbarian debouncer
-      if(statID == STAT_PRINTING) {
-        if(filamentUnits == UNITS_GR)
-          filamentUnits = UNITS_CM;
-        else
-          filamentUnits = UNITS_GR;
-        return;
-      }
+    delay(250); // Barbarian debouncer
+#ifdef DEBUG
+  Serial << "CHANGE_UNIT_PIN = " << stat << " filamentUnits = " << filamentUnits;
+  Serial.println();
+#endif
+    if(filamentUnits == _GR) {
+      filamentUnits = _CM;
+    }
+    else {
+      filamentUnits = _GR;
+    }
   }
 
   digitalWrite(READING_PIN, LOW);
@@ -208,7 +211,7 @@ void setDefaults() {
   statID = STAT_NONE;
   lastRead = 0;
   prevRead = 0;
-  filamentUnits = UNITS_GR;  // default filament units
+  filamentUnits = _GR;  // default filament units
 
   diameterID = digitalRead(DIAMETER_PIN);
   materialID = digitalRead(MATERIAL_PIN);
@@ -323,13 +326,13 @@ void showStat() {
   lcd << calcGgramsToCentimeters(lastRead)/100 << " " << UNITS_MT << " " << calcRemainingPerc(lastRead) << "%";
   lcd.setCursor(0,1);
 
-  if(filamentUnits == UNITS_GR)
-    lcd << stat << " " << consumedGrams << " gr   ";
+  if(filamentUnits == _GR)
+    lcd << stat << " " << consumedGrams << " " << UNITS_GR << "  ";
   else
-    lcd << stat << " " << calcGgramsToCentimeters(consumedGrams) << UNITS_CM << "  ";
-  
+    lcd << stat << " " << calcGgramsToCentimeters(consumedGrams) << " " << UNITS_CM << "  ";
+    
 #ifdef DEBUG
-  Serial << "showStat() consumedGrams = " << (int)consumedGrams;
+  Serial << "showStat() consumedGrams = " << consumedGrams;
   Serial.println();
 #endif
 }
