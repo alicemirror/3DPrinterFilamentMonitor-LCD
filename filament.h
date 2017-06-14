@@ -35,8 +35,9 @@
 #define ROLL2KG 1
 
 #define SYS_READY "Ready"       // System ready
-#define SYS_PRINTING "Run"      // Filament in use
+#define SYS_PRINTING "Print"    // Filament in use
 #define SYS_LOAD "Load"         // Roll loaded
+#define SYS_STARTED "Started"   // Application started
 
 // Status codes
 #define STAT_NONE 0
@@ -47,10 +48,10 @@
 #define DIAMETER175 "1.75 mm"
 #define DIAMETER300 "3.00 mm"
 
-#define UNITS_GR "gr"
-#define UNITS_CM "cm"
-#define UNITS_MT "m"
-#define UNITS_KG "Kg"
+#define UNITS_GR "gr."
+#define UNITS_CM "cm."
+#define UNITS_MT "mt."
+#define UNITS_KG "Kg."
 #define FILAMENT_ROLL "Roll"
 
 #define PLA_MAT "PLA"
@@ -93,6 +94,10 @@
 // Minimum number of grams variation between two reading too high
 // to be considered weight change (force tension from the Extruder)
 #define MIN_EXTRUDER_TENSION 50
+
+// Filament units in grams
+#define UNITS_GR 1
+#define UNITS_CM 2
 
 // Filament material input pin
 #define MATERIAL_PIN 7

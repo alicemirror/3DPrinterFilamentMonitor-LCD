@@ -50,15 +50,162 @@ float lastRead;
 float prevRead;
 // Initial read weight from last reset
 float initialWeight;
-// Triggering weight during initialisation
-float weightTrigger;
+
+// Units display flag. Decide if consume is in grams or cm
+float filamentUnits;
+
+#undef DEBUG
+
+// ==============================================
+// Initialisation
+// ==============================================
+void setup() {
+#ifdef DEBUG
+  Serial.begin(38400);
+#endif
+  
+  // set up the LCD's number of rows and columns: 
+  lcd.begin(16, 2);
+  lcd.setCursor(0,0);
+  // Print a message to the LCD.
+  lcd.print("BalearicDynamics");
+  lcd.setCursor(0, 1);
+  lcd.print("Filament Monitor");
+  delay(3000);
+  lcd.clear();
+
+  lcd.setCursor(0,0);
+  lcd.print("Ver. 1.1.12");
+  lcd.setCursor(0,1);
+  lcd.print("Calibrating...");
+  delay(1000);
+
+  // Initialise the scale with the model calibration factor then set the initial weight to 0
+  scale.set_scale(SCALE_CALIBRATION);
+  scale.tare();
+
+  // Set the dip switch pins
+  pinMode(MATERIAL_PIN, INPUT);   // Dip switch material select
+  pinMode(DIAMETER_PIN, INPUT);   // Dip switch filament diameter select
+  pinMode(WEIGHT_PIN, INPUT);     // Dip switch filament weight select
+  pinMode(READING_PIN, OUTPUT);   // LED reading signal
+  pinMode(SETZERO_PIN, INPUT);    // Push button state change
+  pinMode(RESTART_PIN, OUTPUT);   // Push button restart material
+
+  // Initialised the default values for the default filament type
+  setDefaults();
+
+  lcd.clear();
+  showInfo();
+  delay(2000);
+}
+
+// ==============================================
+// Main loop
+// ==============================================
+
+/* 
+ * The main loop role is execturing the service functions; display update, 
+ * calculations, button checking
+ * The scale reading is done at a specific frequence and is interrupt-driven
+ */
+void loop() {
+  // Get the last reading
+  prevRead = lastRead;
+  lastRead = readScale();
+
+#ifdef DEBUG
+  Serial << "lastRead = " << lastRead << " prevRead = " << prevRead;
+  Serial.println();
+#endif
+
+  digitalWrite(READING_PIN, HIGH); // LED Enable
+
+  // Check the current status of the system
+  switch(statID) {
+    case STAT_READY:
+      // Set the initial weight to calculate the consumed material during a session
+      initialWeight = lastRead;
+      prevRead = lastRead;
+      showLoad();
+      break;
+    case STAT_LOAD:
+      showStat();
+      break;
+    case STAT_PRINTING:
+      // Avoid fluctuations due the extruder tension
+      if( (lastRead-prevRead) >= MIN_EXTRUDER_TENSION) {
+        // Restore the previous reading
+        lastRead = prevRead;
+      }
+      showStat();
+      break;  
+    default:
+        showInfo();
+        break;
+    } // switch
+
+    if(digitalRead(SETZERO_PIN)) {
+      delay(100); // Barbarian debouncer
+#ifdef DEBUG
+  Serial << "SETZERO_PIN pressed statID = " << statID;
+  Serial.println();
+#endif
+        if(statID == STAT_NONE) {
+          statID = STAT_READY;
+          stat = SYS_READY;
+#ifdef DEBUG
+  Serial << "statID changed = " << statID << " " << stat;
+  Serial.println();
+#endif
+          return;
+        }
+        if(statID == STAT_READY) {
+          stat = SYS_LOAD;
+          statID = STAT_LOAD;
+          lcd.clear();
+#ifdef DEBUG
+  Serial << "statID changed = " << statID << " " << stat;
+  Serial.println();
+#endif
+          return;
+        } 
+        if(statID == STAT_LOAD) {
+          // Change from load to running mode
+          stat = SYS_PRINTING;
+          statID = STAT_PRINTING;
+          lcd.clear();
+#ifdef DEBUG
+  Serial << "statID changed = " << statID << " " << stat;
+  Serial.println();
+#endif
+          return;
+        } 
+        if(statID == STAT_PRINTING) {
+          // Change from load to running mode
+          stat = SYS_LOAD;
+          statID = STAT_LOAD;
+          // Set the initial weight to calculate the consumed material during a session
+          initialWeight = lastRead;
+          lcd.clear();
+#ifdef DEBUG
+  Serial << "statID changed = " << statID << " " << stat;
+  Serial.println();
+#endif
+          return;
+        }
+  } // BUTTON
+
+  digitalWrite(READING_PIN, LOW);
+}
 
 // ==============================================
 //  SCALE METHODS
 // ==============================================
 
 /* 
- * Set the gloabl values depending on the material and filament size 
+ * Set the gloabl values depending on the material and filament size parameters
+ * read from the dip switch
  * 
  * \param filament The filament ID
  * \param wID The rolld weight ID
@@ -69,10 +216,11 @@ void setDefaults() {
   int materialID; // Roll material
   int filament; // Filament type
 
-  stat = SYS_READY;
+  stat = SYS_STARTED;
   statID = STAT_NONE;
   lastRead = 0;
   prevRead = 0;
+  filamentUnits = UNITS_GR;  // default filament units
 
   diameterID = digitalRead(DIAMETER_PIN);
   materialID = digitalRead(MATERIAL_PIN);
@@ -100,8 +248,6 @@ void setDefaults() {
       weight = "2";
       break;
   }
-
-  weightTrigger = rollTare;
 
   // Set the parameters depending on the filament
   // characteristics.
@@ -134,7 +280,8 @@ void setDefaults() {
 }
 
 /*
- * Exectues a scale series of readings 
+ * Exectues a scale series of readings without the plastic spool
+ * (and any other extra weight that is not part of the measure)
  */
 float readScale(void) {
 
@@ -146,41 +293,52 @@ float readScale(void) {
 // ==============================================
 
 /* 
- * Show the filament information 
+ * Show the filament information preset
  */
 void showInfo() {
   
   lcd.setCursor(0,0);
-  lcd << material << " " << diameter << " " << weight << " " << UNITS_KG;
+  lcd << material << " " << diameter << " " << weight << " " << UNITS_KG << "  ";
   lcd.setCursor(0,1);
-  lcd << stat;
+  lcd << stat << "    ";
+#ifdef DEBUG
+  Serial << "showInfo()stat = " << stat;
+  Serial.println();
+#endif
 }
 
 /* 
- * Show the filament information 
+ * Show the filament information after the roll has been loaded
  */
 void showLoad() {
   
   lcd.setCursor(0,0);
   lcd << material << " " << diameter << " " << weight << " " << UNITS_KG;
   lcd.setCursor(0,1);
-  lcd << stat << " " << calcRemainingPerc(lastRead) << "%";
+  lcd << stat << " " << calcRemainingPerc(lastRead) << "%    ";
+#ifdef DEBUG
+  Serial << "showLoad() calcRemainingPerc(lastRead) = " << calcRemainingPerc(lastRead);
+  Serial.println();
+#endif
 }
 
 /* 
- * Show the filament status 
+ * Show the filament status while the printing is running
  */
 void showStat() {
   float consumedGrams;
+  consumedGrams = calcConsumedGrams();
+  if(consumedGrams < 0)
+    consumedGrams = 0;
   
   lcd.setCursor(0,0);
   lcd << calcGgramsToCentimeters(lastRead)/100 << " " << UNITS_MT << " " << calcRemainingPerc(lastRead) << "%";
   lcd.setCursor(0,1);
-
-  consumedGrams = calcConsumedGrams();
-  if(consumedGrams > 0) {
-    lcd << stat << " " << consumedGrams << " " << UNITS_GR;
-  }
+  lcd << stat << " " << consumedGrams << " gr   ";
+#ifdef DEBUG
+  Serial << "showStat() consumedGrams = " << (int)consumedGrams;
+  Serial.println();
+#endif
 }
 
 // ==============================================
@@ -223,146 +381,5 @@ float calcRemainingPerc(float w) {
   float calcConsumedCentimeters() {
     return calcGgramsToCentimeters(calcConsumedGrams());
   }
-
-#undef DEBUG
-
-// ==============================================
-// Initialisation
-// ==============================================
-void setup() {
-#ifdef DEBUG
-  Serial.begin(38400);
-#endif
-  
-  // set up the LCD's number of rows and columns: 
-  lcd.begin(16, 2);
-  lcd.setCursor(0,0);
-  // Print a message to the LCD.
-  lcd.print("BalearicDynamics");
-  lcd.setCursor(0, 1);
-  lcd.print("Filament Monitor");
-  delay(3000);
-  lcd.clear();
-
-  lcd.setCursor(0,0);
-  lcd.print("Ver. 1.1.11");
-  lcd.setCursor(0,1);
-  lcd.print("Calibrating...");
-  delay(1000);
-
-  // Initialise the scale with the model calibration factor then set the initial weight to 0
-  scale.set_scale(SCALE_CALIBRATION);
-  scale.tare();
-
-  // Set the dip switch pins
-  pinMode(MATERIAL_PIN, INPUT);
-  pinMode(DIAMETER_PIN, INPUT);
-  pinMode(WEIGHT_PIN, INPUT);
-  pinMode(READING_PIN, OUTPUT);
-  pinMode(SETZERO_PIN, INPUT);
-  pinMode(RESTART_PIN, OUTPUT);
-
-  // Initialised the default values for the default filament type
-  setDefaults();
-
-  lcd.clear();
-  showInfo();
-  delay(2000);
-
-}
-
-// ==============================================
-// Main loop
-// ==============================================
-
-/* 
- * The main loop role is execturing the service functions; display update, 
- * calculations, button checking
- * The scale reading is done at a specific frequence and is interrupt-driven
- * 
- * Note: the weightTrigger is used to reduce the number of inital valid readings
- * then when the system is in PRINTING (run) mode it is set to zero to accept
- * every value and keep the display updated more frequently.
- */
-void loop() {
-  // Get the last reading
-  prevRead = lastRead;
-  lastRead = readScale();
-
-//  // Avoid fluctuations due the extruder tension
-//  if( (lastRead-prevRead) >= MIN_EXTRUDER_TENSION) {
-//    // Restore the previous reading
-//    lastRead = prevRead;
-//  }
-
-#ifdef DEBUG
-  Serial << "lastRead = " << lastRead << " prevRead = " << prevRead << " SCALE_RESOLUTION = " << SCALE_RESOLUTION << " prev-last = " << prevRead - lastRead;
-  Serial.println();
-#endif
-
-  digitalWrite(READING_PIN, HIGH);
-
-    switch(statID) {
-      case STAT_READY:
-        // Set the initial weight to calculate the consumed material during a session
-        initialWeight = lastRead;
-        prevRead = lastRead;
-        showLoad();
-        weightTrigger = 0;
-        break;
-      case STAT_LOAD:
-        showStat();
-        break;
-      case STAT_PRINTING:
-        int deltaRead;
-        deltaRead = prevRead - lastRead;
-        showStat();
-        break;  
-      default:
-          showInfo();
-          break;
-      } // switch
-
-      if(digitalRead(SETZERO_PIN)) {
-        delay(100); // Barbarian debouncer
-#ifdef DEBUG
-  Serial << "SETZERO_PIN pressed " << digitalRead(SETZERO_PIN);
-  Serial.println();
-#endif
-        if(statID == STAT_NONE) {
-          statID = STAT_READY;
-          stat = SYS_READY;
-        }
-        if(statID == STAT_READY) {
-          stat = SYS_LOAD;
-          statID = STAT_LOAD;
-          lcd.clear();
-          return;
-        } 
-        if(statID == STAT_LOAD) {
-          // Change from load to running mode
-          stat = SYS_PRINTING;
-          statID = STAT_PRINTING;
-          lcd.clear();
-          return;
-        } 
-        if(statID == STAT_PRINTING) {
-          // Change from load to running mode
-          stat = SYS_LOAD;
-          statID = STAT_LOAD;
-          // Set the initial weight to calculate the consumed material during a session
-          initialWeight = lastRead;
-          lcd.clear();
-          return;
-        }
-  } // BUTTON
-#ifdef DEBUG
-  Serial << "SETZERO_PIN true " << lastRead << " stat = " << stat << " statID = " << statID;
-  Serial.println();
-#endif
-
-  digitalWrite(READING_PIN, LOW);
-}
-
 
 
