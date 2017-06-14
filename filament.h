@@ -105,7 +105,7 @@
 #define WEIGHT_PIN 11
 
 // Control buttons pins
-#define RESTART_PIN A0
+#define CHANGE_UNIT_PIN A0
 #define SETZERO_PIN 12
 
 // LED pin on when reading

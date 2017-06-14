@@ -114,11 +114,6 @@ void loop() {
   prevRead = lastRead;
   lastRead = readScale();
 
-#ifdef DEBUG
-  Serial << "lastRead = " << lastRead << " prevRead = " << prevRead;
-  Serial.println();
-#endif
-
   digitalWrite(READING_PIN, HIGH); // LED Enable
 
   // Check the current status of the system
@@ -145,29 +140,18 @@ void loop() {
         break;
     } // switch
 
+  // Manage the status change button
     if(digitalRead(SETZERO_PIN)) {
       delay(100); // Barbarian debouncer
-#ifdef DEBUG
-  Serial << "SETZERO_PIN pressed statID = " << statID;
-  Serial.println();
-#endif
         if(statID == STAT_NONE) {
           statID = STAT_READY;
           stat = SYS_READY;
-#ifdef DEBUG
-  Serial << "statID changed = " << statID << " " << stat;
-  Serial.println();
-#endif
           return;
         }
         if(statID == STAT_READY) {
           stat = SYS_LOAD;
           statID = STAT_LOAD;
           lcd.clear();
-#ifdef DEBUG
-  Serial << "statID changed = " << statID << " " << stat;
-  Serial.println();
-#endif
           return;
         } 
         if(statID == STAT_LOAD) {
@@ -175,10 +159,6 @@ void loop() {
           stat = SYS_PRINTING;
           statID = STAT_PRINTING;
           lcd.clear();
-#ifdef DEBUG
-  Serial << "statID changed = " << statID << " " << stat;
-  Serial.println();
-#endif
           return;
         } 
         if(statID == STAT_PRINTING) {
@@ -188,13 +168,21 @@ void loop() {
           // Set the initial weight to calculate the consumed material during a session
           initialWeight = lastRead;
           lcd.clear();
-#ifdef DEBUG
-  Serial << "statID changed = " << statID << " " << stat;
-  Serial.println();
-#endif
           return;
         }
-  } // BUTTON
+  }
+
+  // Manage the partial consumption button. Only when STAT_PRINTING
+  if(digitalRead(CHANGE_UNIT_PIN)) {
+    delay(100); // Barbarian debouncer
+      if(statID == STAT_PRINTING) {
+        if(filamentUnits == UNITS_GR)
+          filamentUnits = UNITS_CM;
+        else
+          filamentUnits = UNITS_GR;
+        return;
+      }
+  }
 
   digitalWrite(READING_PIN, LOW);
 }
@@ -334,7 +322,12 @@ void showStat() {
   lcd.setCursor(0,0);
   lcd << calcGgramsToCentimeters(lastRead)/100 << " " << UNITS_MT << " " << calcRemainingPerc(lastRead) << "%";
   lcd.setCursor(0,1);
-  lcd << stat << " " << consumedGrams << " gr   ";
+
+  if(filamentUnits == UNITS_GR)
+    lcd << stat << " " << consumedGrams << " gr   ";
+  else
+    lcd << stat << " " << calcGgramsToCentimeters(consumedGrams) << UNITS_CM << "  ";
+  
 #ifdef DEBUG
   Serial << "showStat() consumedGrams = " << (int)consumedGrams;
   Serial.println();
