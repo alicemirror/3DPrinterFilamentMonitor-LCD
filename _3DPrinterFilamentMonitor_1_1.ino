@@ -10,6 +10,11 @@
  
  The HX711 board can be powered from 2.7V to 5V so the Arduino 5V power should be fine.
 
+ Licensed under GNU GPL 4.0
+ Author:  Enrico Miglino. (c) 2017
+          Balearic Dynamics SL balearicdynamic@gmail.com
+ Updated sources on GitHUB: https://github.com/alicemirror/3DPrinterFilamentMonitor-LCD/
+
 */
 
 #include <HX711.h>
@@ -75,7 +80,7 @@ void setup() {
   lcd.clear();
 
   lcd.setCursor(0,0);
-  lcd.print("Ver. 1.1.12");
+  lcd.print("Ver. 1.1.14");
   lcd.setCursor(0,1);
   lcd.print("Calibrating...");
   delay(1000);
