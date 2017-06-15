@@ -55,6 +55,8 @@ float lastRead;
 float prevRead;
 // Initial read weight from last reset
 float initialWeight;
+// Last reliable value for consumed grams
+float lastConsumedGrams;
 
 // Units display flag. Decide if consume is in grams or cm
 float filamentUnits;
@@ -80,7 +82,7 @@ void setup() {
   lcd.clear();
 
   lcd.setCursor(0,0);
-  lcd.print("Ver. 1.1.14");
+  lcd.print("Ver. 1.1.15");
   lcd.setCursor(0,1);
   lcd.print("Calibrating...");
   delay(1000);
@@ -217,6 +219,7 @@ void setDefaults() {
   lastRead = 0;
   prevRead = 0;
   filamentUnits = _GR;  // default filament units
+  lastConsumedGrams = 0;
 
   diameterID = digitalRead(DIAMETER_PIN);
   materialID = digitalRead(MATERIAL_PIN);
@@ -324,8 +327,11 @@ void showLoad() {
 void showStat() {
   float consumedGrams;
   consumedGrams = calcConsumedGrams();
+  // Avoid negative values due to floating values (mostly vibrations)
   if(consumedGrams < 0)
-    consumedGrams = 0;
+    consumedGrams = lastConsumedGrams;
+  else
+    lastConsumedGrams = consumedGrams;
   
   lcd.setCursor(0,0);
   lcd << calcGgramsToCentimeters(lastRead)/100 << " " << UNITS_MT << " " << calcRemainingPerc(lastRead) << "%";

@@ -48,10 +48,10 @@
 #define DIAMETER175 "1.75 mm"
 #define DIAMETER300 "3.00 mm"
 
-#define UNITS_GR "gr."
-#define UNITS_CM "cm."
-#define UNITS_MT "mt."
-#define UNITS_KG "Kg."
+#define UNITS_GR "g"
+#define UNITS_CM "cm"
+#define UNITS_MT "m"
+#define UNITS_KG "Kg"
 #define FILAMENT_ROLL "Roll"
 
 #define PLA_MAT "PLA"
