@@ -48,6 +48,9 @@
 #define DIAMETER175 "1.75 mm"
 #define DIAMETER300 "3.00 mm"
 
+// How mamny centimeters in 1 meter (???)
+#define CENTIMETERS_PER_METER 100
+
 #define UNITS_GR "g"
 #define UNITS_CM "cm"
 #define UNITS_MT "m"

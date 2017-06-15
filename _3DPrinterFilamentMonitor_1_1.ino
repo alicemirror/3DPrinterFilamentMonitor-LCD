@@ -327,6 +327,7 @@ void showLoad() {
 void showStat() {
   float consumedGrams;
   consumedGrams = calcConsumedGrams();
+
   // Avoid negative values due to floating values (mostly vibrations)
   if(consumedGrams < 0)
     consumedGrams = lastConsumedGrams;
@@ -337,10 +338,23 @@ void showStat() {
   lcd << calcGgramsToCentimeters(lastRead)/100 << " " << UNITS_MT << " " << calcRemainingPerc(lastRead) << "%";
   lcd.setCursor(0,1);
 
-  if(filamentUnits == _GR)
-    lcd << stat << " " << consumedGrams << " " << UNITS_GR << "  ";
-  else
-    lcd << stat << " " << calcGgramsToCentimeters(consumedGrams) << " " << UNITS_CM << "  ";
+  // Select the representation uinit
+  if(filamentUnits == _GR) {
+    lcd << stat << " " << valOptimizer(consumedGrams) << " " << UNITS_GR << "  ";
+  } // Units in weight
+  else {
+    // Show the length in centimeters until one meter then show in meters
+    float loadedCentimeters;
+    // Convert the weight in length
+    loadedCentimeters = calcGgramsToCentimeters(consumedGrams);
+    // Select the length representation
+    if(loadedCentimeters > CENTIMETERS_PER_METER) {
+      lcd << stat << " " << loadedCentimeters/CENTIMETERS_PER_METER << " " << UNITS_MT << "  ";
+    } // ... in meters
+    else {
+      lcd << stat << " " << valOptimizer(loadedCentimeters) << " " << UNITS_CM << "  ";
+    } // ... in centimeters
+  } // Units in length
     
 #ifdef DEBUG
   Serial << "showStat() consumedGrams = " << consumedGrams;
@@ -351,6 +365,21 @@ void showStat() {
 // ==============================================
 //  CALC METHODS
 // ==============================================
+
+/**
+ * Optimizes the a floating value reducing the precision to one
+ * decimal value
+ * 
+ * \param value The float value to be treated
+ * \return The optimized float value
+ */
+ float valOptimizer(float value) {
+    int optimizer;
+    // Reduce the precison of a factor 10 (0.01) according with the physical precison of the readings
+    optimizer = int(value * 10);
+    return optimizer / 10;
+
+ }
 
 /** 
  *  Caclulate the centimeters for the corresponding weight
